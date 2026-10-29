@@ -1,164 +1,222 @@
+
 <?php
+require_once __DIR__ . '/conexao.php';
 
-require_once 'conexao.php';
+$stmt = $pdo->query("
+    SELECT id, nome_jogador, pontuacao,
+           DATE_FORMAT(data_registro, '%d/%m/%Y %H:%i') AS data
+    FROM ranking
+    ORDER BY pontuacao DESC, id ASC
+    LIMIT 10
+");
 
-// Busca inicial do ranking para carregar rápido na primeira abertura
-$rankingInicial = [];
-try {
-    $stmt = $pdo->query("
-        SELECT id, nome, pontos, DATE_FORMAT(data_registro, '%d/%m/%Y %H:%i') as data 
-        FROM ranking 
-        ORDER BY pontos DESC, id ASC 
-        LIMIT 10
-    ");
-    $rankingInicial = $stmt->fetchAll();
-} catch (Exception $e) {
-    // Caso o banco ainda não possua registros
-    $rankingInicial = [];
-}
+$rankingInicial = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jogo Mario - Se divirta!</title>
-    
+    <title>Jogo Mario-Venha se divertir</title>
     <link rel="stylesheet" href="css/styles.css">
+    <script src="js/script.js" defer></script>
 </head>
 <body>
+<main class="app">
 
-    <div class="game-container">
-        
-        <header class="hud-bar">
-            <div class="player-info">
-                <span class="label">JOGADOR:</span>
-                <span class="value" id="hud-player-name">---</span>
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-icon">★</span>
+            <div>
+                <h1>SE DIVIRTA</h1>
+                <p>Uma aventura no Reino DO MARIO E FLURRY</p>
             </div>
-            <div class="score-info">
-                <span class="label">PONTOS:</span>
-                <span class="value" id="score-display">0</span>
-            </div>
+        </div>
 
-            <div class="score-info">
-                <span class="label">MOEDAS:</span>
-                <span class="value" id="coins-display">0</span>
+        <div class="hud">
+            <div>
+                <small>JOGADOR</small>
+                <strong id="hud-player-name">---</strong>
             </div>
-
-            <div class="score-info">
-                <span class="label">NÍVEL:</span>
-                <span class="value" id="level-display">FÁCIL</span>
+            <div>
+                <small>PONTOS</small>
+                <strong id="score-display">0</strong>
             </div>
-        </header>
+            <div>
+                <small>MOEDAS</small>
+                <strong id="coins-display">0</strong>
+            </div>
+            <div>
+                <small>NÍVEL</small>
+                <strong id="level-display">FÁCIL</strong>
+            </div>
+        </div>
+    </header>
 
-        
-        <main class="game-board" id="game-board">
-            <img src="assets/cenario pixels.jpg" class="background-game" alt="cenario do jogo">
+    <section class="game-shell">
+        <div class="game-board" id="game-board">
+
+            <img src="assets/cenario%20pixels.jpg"
+                 class="background-game" alt="Cenário do jogo">
+
             <div class="mario" id="character">
-                <img src="assets/mario.gif" alt="mario">
+                <img src="assets/mario.gif" alt="Mario">
             </div>
-            <div id="alt-character" class="alt-character" hidden>
+
+            <div class="alt-character" id="alt-character" hidden>
                 <img src="assets/boneca.gif.png" alt="Flurry">
             </div>
-            <img src="assets/cano.pixel.jpg" class="pipe" alt="obstaculo">
+
+            <img src="assets/obstaculo.png"
+                 class="pipe" alt="Obstáculo">
+
             <div id="entities-layer"></div>
-            <span class="jump-tip" id="jump-tip">Pressione ESPAÇO ou clique para pular</span>
-        </main>
-    </div>
 
-    <!-- 1. TELA DE INÍCIO / INSERIR NOME -->
-    <div class="modal-overlay active" id="start-modal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h1 class="game-title">Jogo Mário</h1>
-                <p class="game-subtitle">Corra, desvie dos canos e dispute o topo do ranking!</p>
+            <div class="jump-tip" id="jump-tip">
+                ESPAÇO / ↑ / CLIQUE PARA PULAR
             </div>
 
-            <form class="start-form" id="start-form">
-                <div class="input-group">
-                    <label for="character-choice">ESCOLHA SEU PERSONAGEM:</label>
-                    <input 
-                        type="text" 
-                        id="player-input" 
-                        placeholder="Ex: Seu Nome" 
-                        maxlength="30" 
-                        required 
-                        autocomplete="off"
-                        autofocus
-                    >
-                    <select id="character-choice">
-                        <option value="mario">Mario</option>
-                        <option value="boneca">Flurry</option>
-                    </select>
-                </div>
-
-                <div class="modal-actions">
-                    <button type="submit" class="btn btn-primary" id="btn-start">INICIAR JOGO</button>
-                    <button type="button" class="btn btn-secondary" id="btn-view-ranking">VER RANKING</button>
-                </div>
-            </form>
-
-            <div class="server-status" id="server-status">
-                <span class="status-dot online"></span> Conectado ao MySQL
+            <div class="board-badge" id="board-badge">
+                PRONTO PARA JOGAR?
             </div>
         </div>
-    </div>
 
-    <!-- 2. TELA DE GAME OVER & RANKING -->
-    <div class="modal-overlay" id="gameover-modal">
-        <div class="modal-card gameover-card">
-            <div class="modal-header">
-                <h2 class="gameover-title">GAME OVER</h2>
-                <div class="final-score-box">
-                    <div class="final-score-label">SUA PONTUAÇÃO</div>
-                    <div class="final-score-num" id="final-score-value">0</div>
-                    <div class="save-status" id="final-level-value"></div>
-                    <div class="save-status" id="final-coins-value"></div>
-                </div>
+        <div class="controls">
+            <span>⌨️ Espaço ou seta ↑ para pular</span>
+            <span>🪙 Pegue moedas para ganhar pontos</span>
+            <span>🚧 Não encoste nos obstáculos!</span>
+        </div>
+    </section>
+
+</main>
+
+<!-- TELA INICIAL -->
+<div class="modal-overlay active" id="start-modal">
+    <section class="modal-card">
+
+        <div class="pixel-star">★</div>
+        <p class="eyebrow">AVENTURA NO MUNDO DO MARIO E FLURRY</p>
+        <h2>PIXEL RUN</h2>
+        <p class="muted">
+            Corra, pule os obstáculos e colete moedas!
+        </p>
+
+        <form id="start-form">
+
+            <label for="player-input">NOME DO JOGADOR</label>
+            <input
+                id="player-input"
+                name="nome"
+                type="text"
+                maxlength="50"
+                placeholder="Digite seu nome"
+                required
+            >
+
+            <label for="character-choice">ESCOLHA SEU PERSONAGEM</label>
+            <select id="character-choice" name="personagem">
+                <option value="mario">Mario</option>
+                <option value="boneca">Flurry</option>
+            </select>
+
+            <button type="submit" class="btn primary">
+                ▶ INICIAR JOGO
+            </button>
+
+            <button type="button" class="btn secondary"
+                    id="btn-view-ranking">
+                🏆 VER RANKING
+            </button>
+        </form>
+
+        <p class="server-note">
+            Pontuações salvas no ranking MySQL
+        </p>
+
+    </section>
+</div>
+
+<!-- TELA FINAL -->
+<div class="modal-overlay" id="gameover-modal">
+    <section class="modal-card results-card">
+
+        <p class="eyebrow">FIM DE JOGO</p>
+        <h2 id="gameover-heading">GAME OVER!</h2>
+
+        <div class="result-stats">
+            <div>
+                <small>PONTUAÇÃO FINAL</small>
+                <strong id="final-score-value">0</strong>
             </div>
+            <div>
+                <small>MOEDAS</small>
+                <strong id="final-coins-value">0</strong>
+            </div>
+            <div>
+                <small>NÍVEL ALCANÇADO</small>
+                <strong id="final-level-value">FÁCIL</strong>
+            </div>
+        </div>
 
-            <!-- Tabela com o TOP 10 -->
-            <div class="ranking-container">
-                <h3 class="ranking-title">🏆 TOP 10 MELHORES PONTUAÇÕES</h3>
-                <div class="table-wrapper">
-                    <table class="ranking-table">
-                        <thead>
-                            <tr>
-                                <th>POS</th>
-                                <th>JOGADOR</th>
-                                <th>PONTUAÇÃO</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ranking-body">
-                            <?php if (!empty($rankingInicial)): ?>
-                                <?php foreach ($rankingInicial as $i => $row): ?>
-                                    <tr>
-                                        <td class="ranking-pos">
-                                            <?= $i === 0 ? '🥇 1º' : ($i === 1 ? '🥈 2º' : ($i === 2 ? '🥉 3º' : ($i + 1) . 'º')) ?>
-                                        </td>
-                                        <td><strong><?= htmlspecialchars($row['nome']) ?></strong></td>
-                                        <td><?= (int)$row['pontos'] ?> pts</td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
+        <p class="save-status" id="save-status-msg"></p>
+
+        <div class="ranking-container">
+            <h3>🏆 TOP 10 JOGADORES</h3>
+
+            <div class="table-wrapper">
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>JOGADOR</th>
+                            <th>PONTOS</th>
+                            <th>DATA</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="ranking-body">
+                        <?php if ($rankingInicial): ?>
+                            <?php foreach ($rankingInicial as $i => $row): ?>
                                 <tr>
-                                    <td colspan="3" class="loading-cell">Nenhuma pontuação gravada ainda. Jogue para ser o 1º!</td>
+                                    <td><?= $i + 1 ?></td>
+                                    <td><?= htmlspecialchars(
+                                        $row['nome_jogador'],
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?></td>
+                                    <td><?= (int)$row['pontuacao'] ?></td>
+                                    <td><?= htmlspecialchars(
+                                        (string)$row['data'],
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?></td>
                                 </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="modal-actions">
-                <button type="button" class="btn btn-primary" id="btn-restart">JOGAR NOVAMENTE</button>
-                <button type="button" class="btn btn-secondary" id="btn-change-player">TROCAR JOGADOR</button>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="4" class="empty">
+                                    Ainda não há pontuações. Seja o primeiro!
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
-    </div>
 
-   
-    <script src="js/script.js" defer></script>
+        <div class="modal-actions">
+            <button type="button" class="btn primary" id="btn-restart">
+                ↻ JOGAR NOVAMENTE
+            </button>
+
+            <button type="button" class="btn secondary"
+                    id="btn-change-player">
+                TROCAR JOGADOR
+            </button>
+        </div>
+
+    </section>
+</div>
+
 </body>
 </html>
